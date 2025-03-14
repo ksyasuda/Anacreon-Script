@@ -66,6 +66,15 @@ else
   platform = 'linux'
 end
 
+local display_server
+if os.getenv("WAYLAND_DISPLAY") ~= "" then
+	display_server = 'wayland'
+elseif platform == 'linux' then
+	display_server = 'xorg'
+else
+	display_server = ""
+end
+
 local function dlog(...)
   if debug_mode then
     print(...)
@@ -158,10 +167,16 @@ local function get_clipboard()
     } })
   elseif platform == 'macos' then
     return io.popen('LANG=en_US.UTF-8 pbpaste'):read("*a")
-  else
-    res = utils.subprocess({ args = {
-      'xclip', '-selection', 'clipboard', '-out'
-    } })
+  else -- platform == 'linux'
+    if display_server == 'wayland' then
+      res = utils.subprocess({ args = {
+        'wl-paste'
+      } })
+    else -- display_server == 'xorg'
+      res = utils.subprocess({ args = {
+        'xclip', '-selection', 'clipboard', '-out'
+      } })
+    end
   end
   if not res.error then
     return res.stdout
@@ -185,7 +200,11 @@ local function determine_clip_type()
 end
 
 local function linux_set_clipboard(text)
-  os.execute('xclip -selection clipboard <<EOF\n' .. text .. '\nEOF\n')
+  if display_server == 'wayland' then
+    os.execute('wl-copy <<EOF\n' .. text .. '\nEOF\n')
+  else -- display_server == 'xorg'
+    os.execute('xclip -selection clipboard <<EOF\n' .. text .. '\nEOF\n')
+  end
 end
 
 local function macos_set_clipboard(text)
