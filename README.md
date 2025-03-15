@@ -1,5 +1,9 @@
 # Anacreon MPV script
 
+Usage guide here: <https://animecards.site/minefromanime/>
+
+___
+
 This script was created by anacreon from the DJT thread. Find his website here: https://anacreondjt.gitlab.io/
 
 Sadly he seems to have disappeared and no longer provide support or updates to the script and as there is no organized effort to provide LTS for it, I hope we can organize something here. @anacreon if you have a problem with this, please let me know and I will remove this repository.
@@ -13,6 +17,7 @@ Notable changes so far:
 - Disable subtitle writing to clipboard by default. Use this instead: https://github.com/kuroahna/mpv_websocket .
     - **Subtitle functionality is still used to determine what subtitle lines to use in the Anki card. It may make sense to replace clipboard functionality with a small platform independent subtitle selection menu.**
 - The default card fields conform with the Lapis note type by default. If you use [Lapis](https://github.com/donkuri/lapis) or [my fork](https://github.com/friedrich-de/lapis-modified) **(RECOMMENDED)** of it, this script should require zero configuration.
+- Added support for Wayland clipboard; Thanks to @kayprish
 
 
 I'm not proficient in Lua. It would be great if someone took over or helped with this project providing LTS.
