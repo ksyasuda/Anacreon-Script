@@ -60,6 +60,7 @@ local o = {}
 local platform = mp.get_property_native("platform")
 if platform == "darwin" then
   platform = "macos"
+end
 
 local display_server
 if os.getenv("WAYLAND_DISPLAY") ~= "" then
@@ -75,6 +76,9 @@ local function dlog(...)
     print(...)
   end
 end
+
+dlog("Detected Platform: " .. platform)
+dlog("Detected display server: " .. display_server)
 
 local function anki_connect(action, params)
   local request
