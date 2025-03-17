@@ -47,10 +47,12 @@ local AUTOPLAY_AUDIO = false
 local IMAGE_FORMAT = "png"
 -- Optional set to true if you want your volume in mpv to affect Anki card volume.
 local USE_MPV_VOLUME = false
+-- Set to true if you want writing to clipboard to be enabled by default.
+-- The more modern and recommended alternative is to use the websocket.
+local ENABLE_SUBS_TO_CLIP = false
 ---------------------------------------
 
 local subs = {}
-local enable_subs_to_clip = false
 local debug_mode = true
 local use_powershell_clipboard = nil
 
@@ -221,7 +223,7 @@ local function record_sub(_, text)
 
     subs[newtext] = { mp.get_property_number('sub-start') + sub_delay - audio_delay, mp.get_property_number('sub-end') + sub_delay - audio_delay }
     dlog(string.format("%s -> %s : %s", subs[newtext][1], subs[newtext][2], newtext))
-    if enable_subs_to_clip then
+    if ENABLE_SUBS_TO_CLIP then
       -- Remove newlines from text before sending it to clipboard.
       -- This way pressing control+v without copying from texthooker page
       -- will always give last line.
@@ -404,8 +406,8 @@ local function rec(...)
 end
 
 local function toggle_sub_to_clipboard()
-  enable_subs_to_clip = not enable_subs_to_clip
-  mp.osd_message("Clipboard inserter " .. (enable_subs_to_clip and "activated" or "deactived"), 3)
+  ENABLE_SUBS_TO_CLIP = not ENABLE_SUBS_TO_CLIP
+  mp.osd_message("Clipboard inserter " .. (ENABLE_SUBS_TO_CLIP and "activated" or "deactived"), 3)
 end
 
 local function toggle_debug_mode()
