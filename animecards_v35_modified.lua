@@ -57,14 +57,9 @@ local use_powershell_clipboard = nil
 if unpack ~= nil then table.unpack = unpack end
 
 local o = {}
-local platform
-if mp.get_property_native('options/vo-mmcss-profile', o) ~= o then
-  platform = 'windows'
-elseif mp.get_property('options/cocoa-force-dedicated-gpu', o) ~= o then
-  platform = 'macos'
-else
-  platform = 'linux'
-end
+local platform = mp.get_property_native("platform")
+if platform == "darwin" then
+  platform = "macos"
 
 local display_server
 if os.getenv("WAYLAND_DISPLAY") ~= "" then
