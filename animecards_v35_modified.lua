@@ -57,13 +57,9 @@ local use_powershell_clipboard = nil
 if unpack ~= nil then table.unpack = unpack end
 
 local o = {}
-local platform
-if mp.get_property_native('options/vo-mmcss-profile', o) ~= o then
-  platform = 'windows'
-elseif mp.get_property('options/cocoa-force-dedicated-gpu', o) ~= o then
-  platform = 'macos'
-else
-  platform = 'linux'
+local platform = mp.get_property_native("platform")
+if platform == "darwin" then
+  platform = "macos"
 end
 
 local display_server
@@ -80,6 +76,9 @@ local function dlog(...)
     print(...)
   end
 end
+
+dlog("Detected Platform: " .. platform)
+dlog("Detected display server: " .. display_server)
 
 local function anki_connect(action, params)
   local request
