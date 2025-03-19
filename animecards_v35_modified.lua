@@ -50,27 +50,33 @@ local USE_MPV_VOLUME = false
 -- Set to true if you want writing to clipboard to be enabled by default.
 -- The more modern and recommended alternative is to use the websocket.
 local ENABLE_SUBS_TO_CLIP = false
+
 ---------------------------------------
 
+------------- Internal Variables -------------
 local subs = {}
 local debug_mode = true
 local use_powershell_clipboard = nil
+---------------------------------------
 
+
+------------- Setup -------------
 if unpack ~= nil then table.unpack = unpack end
 
 local o = {}
+-- Possible platforms: windows, linux, macos
 local platform = mp.get_property_native("platform")
 if platform == "darwin" then
   platform = "macos"
 end
 
 local display_server
-if os.getenv("WAYLAND_DISPLAY") ~= "" then
-	display_server = 'wayland'
+if os.getenv("WAYLAND_DISPLAY") then
+    display_server = 'wayland'
 elseif platform == 'linux' then
-	display_server = 'xorg'
+    display_server = 'xorg'
 else
-	display_server = ""
+    display_server = ""
 end
 
 local function dlog(...)
@@ -79,37 +85,49 @@ local function dlog(...)
   end
 end
 
+local function verfiy_libmp3lame()
+    local encoderlist = mp.get_property("encoder-list")
+    if not encoderlist or not string.find(encoderlist, "libmp3lame") then
+        mp.osd_message("Error: libmp3lame encoder not found. Audio export will not work.\nPlease use a build of mpv with libmp3lame support.", 10)
+        msg.error("Error: libmp3lame encoder not found. MP3 audio export will not work.")
+    else
+        dlog("libmp3lame encoder found.")
+    end
+end
+
+mp.register_event("file-loaded", verfiy_libmp3lame)
+
 dlog("Detected Platform: " .. platform)
 dlog("Detected display server: " .. display_server)
 
+---------------------------------------
 local function anki_connect(action, params)
-  local request
-  request = utils.format_json({action=action, params=params, version=6})
+  local request = utils.format_json({action=action, params=params, version=6})
   local args = {'curl', '-s', 'localhost:8765', '-X', 'POST', '-d', request}
-  
+
   dlog("AnkiConnect request: " .. request)
-  
+
   local result = utils.subprocess({ args = args, cancellable = false, capture_stderr = true })
-  
+
   if result.status ~= 0 then
     msg.error("Curl command failed with status: " .. tostring(result.status))
     msg.error("Stderr: " .. (result.stderr or "none"))
     return nil
   end
-  
+
   if not result.stdout or result.stdout == "" then
     msg.error("Empty response from AnkiConnect")
     return nil
   end
-  
+
   dlog("AnkiConnect response: " .. result.stdout)
-  
+
   local success, parsed_result = pcall(function() return utils.parse_json(result.stdout) end)
   if not success or not parsed_result then
     msg.error("Failed to parse JSON response: " .. (result.stdout or "empty"))
     return nil
   end
-  
+
   return parsed_result
 end
 
@@ -118,8 +136,8 @@ local prefix = ""
 local media_dir_response = anki_connect('getMediaDirPath')
 
 if not media_dir_response then
-  msg.error("AnkiConnect call failed completely")
-  mp.osd_message("Error: Failed to communicate with AnkiConnect", 5)
+  msg.error("Failed to communicate with AnkiConnect. Is Anki running?")
+  mp.osd_message("Error: Failed to communicate with AnkiConnect. Is Anki running?", 5)
   return
 elseif media_dir_response["error"] then
   msg.error("AnkiConnect error: " .. tostring(media_dir_response["error"]))
