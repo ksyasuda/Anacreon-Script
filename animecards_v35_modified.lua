@@ -57,6 +57,7 @@ local ENABLE_SUBS_TO_CLIP = false
 local subs = {}
 local debug_mode = true
 local use_powershell_clipboard = nil
+local prefix = ""
 ---------------------------------------
 
 
@@ -101,6 +102,7 @@ dlog("Detected Platform: " .. platform)
 dlog("Detected display server: " .. display_server)
 
 ---------------------------------------
+-- Handle requests to AnkiConnect
 local function anki_connect(action, params)
   local request = utils.format_json({action=action, params=params, version=6})
   local args = {'curl', '-s', 'localhost:8765', '-X', 'POST', '-d', request}
@@ -132,24 +134,24 @@ local function anki_connect(action, params)
 end
 
 -- Get media directory path from AnkiConnect
-local prefix = ""
-local media_dir_response = anki_connect('getMediaDirPath')
-
-if not media_dir_response then
-  msg.error("Failed to communicate with AnkiConnect. Is Anki running?")
-  mp.osd_message("Error: Failed to communicate with AnkiConnect. Is Anki running?", 5)
-  return
-elseif media_dir_response["error"] then
-  msg.error("AnkiConnect error: " .. tostring(media_dir_response["error"]))
-  mp.osd_message("AnkiConnect error: " .. tostring(media_dir_response["error"]), 5)
-  return
-elseif media_dir_response["result"] then
-  prefix = media_dir_response["result"]
-  dlog("Got media directory path from AnkiConnect: " .. prefix)
-else
-  msg.error("Unexpected response format from AnkiConnect")
-  mp.osd_message("Error: Unexpected response from AnkiConnect", 5)
-  return
+local function set_media_dir()
+  local media_dir_response = anki_connect('getMediaDirPath')
+  if not media_dir_response then
+    msg.error("Failed to communicate with AnkiConnect. Is Anki running and do you have AnkiConnect installed?")
+    mp.osd_message("Error: Failed to communicate with AnkiConnect. Is Anki running and do you have AnkiConnect installed?", 5)
+    return
+  elseif media_dir_response["error"] then
+    msg.error("AnkiConnect error: " .. tostring(media_dir_response["error"]))
+    mp.osd_message("AnkiConnect error: " .. tostring(media_dir_response["error"]), 5)
+    return
+  elseif media_dir_response["result"] then
+    prefix = media_dir_response["result"]
+    dlog("Got media directory path from AnkiConnect: " .. prefix)
+  else
+    msg.error("Unexpected response format from AnkiConnect")
+    mp.osd_message("Error: Unexpected response from AnkiConnect", 5)
+    return
+  end
 end
 
 local function clean(s)
@@ -408,6 +410,11 @@ local function get_extract()
 end
 
 local function ex()
+
+  if not prefix or prefix == "" then
+    set_media_dir()
+  end
+
   if debug_mode then
     get_extract()
   else
