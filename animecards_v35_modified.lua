@@ -50,6 +50,8 @@ local USE_MPV_VOLUME = false
 -- Set to true if you want writing to clipboard to be enabled by default.
 -- The more modern and recommended alternative is to use the websocket.
 local ENABLE_SUBS_TO_CLIP = false
+-- Set to true to always open the browser after a card update
+local ALWAYS_OPEN_BROWSER = false
 
 ---------------------------------------
 
@@ -350,6 +352,15 @@ local function add_to_last_added(ifield, afield, tfield)
   table.sort(added_notes)
   local noteid = added_notes[#added_notes]
   local note = anki_connect('notesInfo', {notes={noteid}})
+  local selected_notes = anki_connect("guiSelectedNotes")["result"]
+  local is_note_focused
+
+  -- Use an impossible nid in the browser query to unfocus the card
+  -- Otherwise, it will cause the known issue where the card doesn't get updated
+  if #selected_notes == 1 and selected_notes[1] == noteid then
+    is_note_focused = true
+    anki_connect("guiBrowse", {query='nid:1'})
+  end
 
   if note ~= nil then
     local word = note["result"][1]["fields"][FRONT_FIELD]["value"]
@@ -365,6 +376,10 @@ local function add_to_last_added(ifield, afield, tfield)
         fields=new_fields
       }
     })
+
+    if ALWAYS_OPEN_BROWSER or is_note_focused then
+      anki_connect("guiBrowse", {query='nid:' .. noteid})
+    end
 
     mp.osd_message("Updated note: " .. word, 3)
     msg.info("Updated note: " .. word)

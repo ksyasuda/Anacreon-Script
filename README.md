@@ -18,6 +18,7 @@ Notable changes so far:
     - **Subtitle functionality is still used to determine what subtitle lines to use in the Anki card. It may make sense to replace clipboard functionality with a small platform independent subtitle selection menu.**
 - The default card fields conform with the Lapis note type by default. If you use [Lapis](https://github.com/donkuri/lapis) or [my fork](https://github.com/friedrich-de/lapis-modified) **(RECOMMENDED)** of it, this script should require zero configuration.
 - Added support for Wayland clipboard; Thanks to @kayprish
+- Added functionality to open the card browser after adding media and fixed the bug where notes would fail to update when selected in the card browser; Thanks to @adxria
 
 
 I'm not proficient in Lua. It would be great if someone took over or helped with this project providing LTS.
