@@ -28,6 +28,7 @@
 
 local utils = require 'mp.utils'
 local msg = require 'mp.msg'
+local input = require 'mp.input'
 
 ------------- User Config -------------
 -- Set these to match your field names in Anki
@@ -52,6 +53,12 @@ local USE_MPV_VOLUME = false
 local ENABLE_SUBS_TO_CLIP = false
 -- Set to true to always open the browser after a card update
 local ALWAYS_OPEN_BROWSER = false
+-- Ask for confirmation before overwriting cards
+-- Recommended to be true unless your MPV version is <0.39
+local ASK_TO_OVERWRITE = true
+-- Limits the number of cards that can be overwritten at once
+-- Set to -1 to disable the limit (Not recommended)
+local OVERWRITE_LIMIT = 8
 
 ---------------------------------------
 
@@ -75,11 +82,11 @@ end
 
 local display_server
 if os.getenv("WAYLAND_DISPLAY") then
-    display_server = 'wayland'
+  display_server = 'wayland'
 elseif platform == 'linux' then
-    display_server = 'xorg'
+  display_server = 'xorg'
 else
-    display_server = ""
+  display_server = ""
 end
 
 local function dlog(...)
@@ -89,13 +96,15 @@ local function dlog(...)
 end
 
 local function verfiy_libmp3lame()
-    local encoderlist = mp.get_property("encoder-list")
-    if not encoderlist or not string.find(encoderlist, "libmp3lame") then
-        mp.osd_message("Error: libmp3lame encoder not found. Audio export will not work.\nPlease use a build of mpv with libmp3lame support.", 10)
-        msg.error("Error: libmp3lame encoder not found. MP3 audio export will not work.")
-    else
-        dlog("libmp3lame encoder found.")
-    end
+  local encoderlist = mp.get_property("encoder-list")
+  if not encoderlist or not string.find(encoderlist, "libmp3lame") then
+    mp.osd_message(
+      "Error: libmp3lame encoder not found. Audio export will not work.\nPlease use a build of mpv with libmp3lame support.",
+      10)
+    msg.error("Error: libmp3lame encoder not found. MP3 audio export will not work.")
+  else
+    dlog("libmp3lame encoder found.")
+  end
 end
 
 mp.register_event("file-loaded", verfiy_libmp3lame)
@@ -106,8 +115,8 @@ dlog("Detected display server: " .. display_server)
 ---------------------------------------
 -- Handle requests to AnkiConnect
 local function anki_connect(action, params)
-  local request = utils.format_json({action=action, params=params, version=6})
-  local args = {'curl', '-s', 'localhost:8765', '-X', 'POST', '-d', request}
+  local request = utils.format_json({ action = action, params = params, version = 6 })
+  local args = { 'curl', '-s', 'localhost:8765', '-X', 'POST', '-d', request }
 
   dlog("AnkiConnect request: " .. request)
 
@@ -140,7 +149,8 @@ local function set_media_dir()
   local media_dir_response = anki_connect('getMediaDirPath')
   if not media_dir_response then
     msg.error("Failed to communicate with AnkiConnect. Is Anki running and do you have AnkiConnect installed?")
-    mp.osd_message("Error: Failed to communicate with AnkiConnect. Is Anki running and do you have AnkiConnect installed?", 5)
+    mp.osd_message(
+      "Error: Failed to communicate with AnkiConnect. Is Anki running and do you have AnkiConnect installed?", 5)
     return
   elseif media_dir_response["error"] then
     msg.error("AnkiConnect error: " .. tostring(media_dir_response["error"]))
@@ -156,22 +166,23 @@ local function set_media_dir()
   end
 end
 
-local function clean(s)
-  for _, ws in ipairs({'%s', ' ', '᠎', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '​', ' ', ' ', '　', '﻿', '‪'}) do
-    s = s:gsub(ws..'+', "")
+local function clean(sub_text)
+  for _, ws in ipairs({ '%s', ' ', '᠎', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '​', ' ', ' ', '　', '﻿', '‪' }) do
+    sub_text = sub_text:gsub(ws .. '+', "")
   end
-  return s
+  return sub_text
 end
 
-local function get_name(s, e)
-  return mp.get_property("filename"):gsub('%W','').. tostring(s) .. tostring(e)
+local function get_name(start_time, end_time)
+  return mp.get_property("filename"):gsub('%W', '') .. tostring(start_time) .. tostring(end_time)
 end
 
 local function get_clipboard()
   local res
   if platform == 'windows' then
-    res = utils.subprocess({ args = {
-      'powershell', '-NoProfile', '-Command', [[& {
+    res = utils.subprocess({
+      args = {
+        'powershell', '-NoProfile', '-Command', [[& {
         Trap {
           Write-Error -ErrorRecord $_
           Exit 1
@@ -187,18 +198,23 @@ local function get_clipboard()
         $u8clip = [System.Text.Encoding]::UTF8.GetBytes($clip)
         [Console]::OpenStandardOutput().Write($u8clip, 0, $u8clip.Length)
       }]]
-    } })
+      }
+    })
   elseif platform == 'macos' then
     return io.popen('LANG=en_US.UTF-8 pbpaste'):read("*a")
   else -- platform == 'linux'
     if display_server == 'wayland' then
-      res = utils.subprocess({ args = {
-        'wl-paste'
-      } })
+      res = utils.subprocess({
+        args = {
+          'wl-paste'
+        }
+      })
     else -- display_server == 'xorg'
-      res = utils.subprocess({ args = {
-        'xclip', '-selection', 'clipboard', '-out'
-      } })
+      res = utils.subprocess({
+        args = {
+          'xclip', '-selection', 'clipboard', '-out'
+        }
+      })
     end
   end
   if not res.error then
@@ -206,33 +222,51 @@ local function get_clipboard()
   end
 end
 
-local function powershell_set_clipboard(text)
-  utils.subprocess({ args = {
-    'powershell', '-NoProfile', '-Command', [[Set-Clipboard -Value @"]] .. "\n" .. text .. "\n" .. [["@]]
-  }})
-end
+local function set_clipboard(text)
+  -- Remove newlines from text before sending it to clipboard.
+  -- This way pressing control+v without copying from texthooker page
+  -- will always give last line.
+  text = string.gsub(text, "[\n\r]+", " ")
 
-local function cmd_set_clipboard(text)
-  local cmd = 'echo ' .. text .. ' | clip';
-  mp.command("run cmd /D /C " .. cmd);
-end
+  if platform == 'windows' then
+    -- Windows clipboard handling with automatic type detection
+    if use_powershell_clipboard == nil then
+      -- Test PowerShell clipboard functionality inline
+      local test_text = [[Anacreon様]]
+      utils.subprocess({
+        args = {
+          'powershell', '-NoProfile', '-Command', [[Set-Clipboard -Value @"]] ..
+        "\n" .. test_text .. "\n" .. [["@]]
+        }
+      })
+      use_powershell_clipboard = get_clipboard() == test_text
+      dlog("Using PowerShell clipboard: " .. (use_powershell_clipboard and "yes" or "no"))
+    end
 
-local function determine_clip_type()
-  powershell_set_clipboard([[Anacreon様]])
-  use_powershell_clipboard = get_clipboard() == [[Anacreon様]]
-end
-
-local function linux_set_clipboard(text)
-  if display_server == 'wayland' then
-    os.execute('wl-copy <<EOF\n' .. text .. '\nEOF\n')
-  else -- display_server == 'xorg'
-    os.execute('xclip -selection clipboard <<EOF\n' .. text .. '\nEOF\n')
+    -- Use determined clipboard method
+    if use_powershell_clipboard then
+      utils.subprocess({
+        args = {
+          'powershell', '-NoProfile', '-Command', [[Set-Clipboard -Value @"]] .. "\n" .. text .. "\n" .. [["@]]
+        }
+      })
+    else
+      local cmd = 'echo ' .. text .. ' | clip'
+      mp.command("run cmd /D /C " .. cmd)
+    end
+  elseif platform == 'macos' then
+    -- macOS clipboard handling
+    os.execute('export LANG=en_US.UTF-8; cat <<EOF | pbcopy\n' .. text .. '\nEOF\n')
+  else
+    -- Linux clipboard handling
+    if display_server == 'wayland' then
+      os.execute('wl-copy <<EOF\n' .. text .. '\nEOF\n')
+    else -- assume xorg
+      os.execute('xclip -selection clipboard <<EOF\n' .. text .. '\nEOF\n')
+    end
   end
 end
 
-local function macos_set_clipboard(text)
-  os.execute('export LANG=en_US.UTF-8; cat <<EOF | pbcopy\n' .. text .. '\nEOF\n')
-end
 
 local function record_sub(_, text)
   if text and mp.get_property_number('sub-start') and mp.get_property_number('sub-end') then
@@ -243,41 +277,28 @@ local function record_sub(_, text)
       return
     end
 
-    subs[newtext] = { mp.get_property_number('sub-start') + sub_delay - audio_delay, mp.get_property_number('sub-end') + sub_delay - audio_delay }
+    subs[newtext] = { mp.get_property_number('sub-start') + sub_delay - audio_delay, mp.get_property_number(
+      'sub-end') +
+    sub_delay - audio_delay }
     dlog(string.format("%s -> %s : %s", subs[newtext][1], subs[newtext][2], newtext))
     if ENABLE_SUBS_TO_CLIP then
       -- Remove newlines from text before sending it to clipboard.
       -- This way pressing control+v without copying from texthooker page
       -- will always give last line.
-      text = string.gsub(text, "[\n\r]+", " ")
-      if platform == 'windows' then
-        if use_powershell_clipboard == nil then
-          determine_clip_type()
-        end
-        if use_powershell_clipboard then
-          powershell_set_clipboard(text)
-        else
-          cmd_set_clipboard(text)
-        end
-      elseif platform == 'macos' then
-        macos_set_clipboard(text)
-      else
-        linux_set_clipboard(text)
-      end
+      set_clipboard(text)
     end
   end
 end
 
-local function create_audio(s, e)
-
-  if s == nil or e == nil then
+local function create_audio(start_time, end_time)
+  if start_time == nil or end_time == nil then
     return
   end
 
-  local name = get_name(s, e)
+  local name = get_name(start_time, end_time)
   local destination = utils.join_path(prefix, name .. '.mp3')
-  s = s - AUDIO_CLIP_PADDING
-  local t = e - s + AUDIO_CLIP_PADDING
+  start_time = start_time - AUDIO_CLIP_PADDING
+  local duration = end_time - start_time + AUDIO_CLIP_PADDING
   local source = mp.get_property("path")
   local aid = mp.get_property("aid")
 
@@ -304,21 +325,22 @@ local function create_audio(s, e)
     '--no-ocopy-metadata',
     '--no-sub',
     '--audio-channels=1',
-    string.format('--start=%.3f', s),
-    string.format('--length=%.3f', t),
+    string.format('--start=%.3f', start_time),
+    string.format('--length=%.3f', duration),
     string.format('--aid=%s', aid),
     string.format('--volume=%s', USE_MPV_VOLUME and mp.get_property('volume') or '100'),
-    string.format("--af-append=afade=t=in:curve=ipar:st=%.3f:d=%.3f", s, AUDIO_CLIP_FADE),
-    string.format("--af-append=afade=t=out:curve=ipar:st=%.3f:d=%.3f", s + t - AUDIO_CLIP_FADE, AUDIO_CLIP_FADE),
+    string.format("--af-append=afade=t=in:curve=ipar:st=%.3f:d=%.3f", start_time, AUDIO_CLIP_FADE),
+    string.format("--af-append=afade=t=out:curve=ipar:st=%.3f:d=%.3f", start_time + duration - AUDIO_CLIP_FADE,
+      AUDIO_CLIP_FADE),
     string.format('-o=%s', destination)
   }
   mp.commandv(table.unpack(cmd))
   dlog(utils.to_string(cmd))
 end
 
-local function create_screenshot(s, e)
+local function create_screenshot(start_time, end_time)
   local source = mp.get_property("path")
-  local img = utils.join_path(prefix, get_name(s,e) .. '.' .. IMAGE_FORMAT)
+  local img = utils.join_path(prefix, get_name(start_time, end_time) .. '.' .. IMAGE_FORMAT)
 
   local cmd = {
     'run',
@@ -337,21 +359,43 @@ local function create_screenshot(s, e)
     table.insert(cmd, '--ovcopts-add=preset=drawing')
   elseif IMAGE_FORMAT == 'png' then
     table.insert(cmd, '--vf-add=format=rgb24')
+    table.insert(cmd, '--ovc=png')
   end
   table.insert(cmd, '--vf-add=scale=480*iw*sar/ih:480')
   table.insert(cmd, string.format('--start=%.3f', mp.get_property_number("time-pos")))
+  table.insert(cmd, '--ofopts-add=update=1')
   table.insert(cmd, string.format('-o=%s', img))
   mp.commandv(table.unpack(cmd))
   dlog(utils.to_string(cmd))
 end
 
 
+local function update_fields(noteid, image_field, audio_field, text_field)
+  local new_fields = {
+    [IMAGE_FIELD] = image_field,
+    [SENTENCE_AUDIO_FIELD] = audio_field,
+    [SENTENCE_FIELD] = text_field
+  }
 
-local function add_to_last_added(ifield, afield, tfield)
-  local added_notes = anki_connect('findNotes', {query='added:1'})["result"]
+  anki_connect('updateNoteFields', {
+    note = {
+      id = noteid,
+      fields = new_fields
+    }
+  })
+end
+
+local function get_word(noteid)
+  local note = anki_connect('notesInfo', { notes = { noteid } })
+  local word = note["result"][1]["fields"][FRONT_FIELD]["value"]
+  return word
+end
+
+
+local function add_to_last_added(image_field, audio_field, text_field)
+  local added_notes = anki_connect('findNotes', { query = 'added:1' })["result"]
   table.sort(added_notes)
   local noteid = added_notes[#added_notes]
-  local note = anki_connect('notesInfo', {notes={noteid}})
   local selected_notes = anki_connect("guiSelectedNotes")["result"]
   local is_note_focused
 
@@ -359,89 +403,171 @@ local function add_to_last_added(ifield, afield, tfield)
   -- Otherwise, it will cause the known issue where the card doesn't get updated
   if #selected_notes == 1 and selected_notes[1] == noteid then
     is_note_focused = true
-    anki_connect("guiBrowse", {query='nid:1'})
+    anki_connect("guiBrowse", { query = 'nid:1' })
   end
 
-  if note ~= nil then
-    local word = note["result"][1]["fields"][FRONT_FIELD]["value"]
-    local new_fields = {
-      [SENTENCE_AUDIO_FIELD]=afield,
-      [SENTENCE_FIELD]=tfield,
-      [IMAGE_FIELD]=ifield
-    }
-
-    anki_connect('updateNoteFields', {
-      note={
-        id=noteid,
-        fields=new_fields
-      }
-    })
-
-    if ALWAYS_OPEN_BROWSER or is_note_focused then
-      anki_connect("guiBrowse", {query='nid:' .. noteid})
-    end
-
-    mp.osd_message("Updated note: " .. word, 3)
-    msg.info("Updated note: " .. word)
+  if noteid == nil then
+    mp.osd_message("ERR! Last added card not found.", 3)
+    return
   end
+
+  local word = get_word(noteid)
+
+  update_fields(noteid, image_field, audio_field, text_field)
+
+  if ALWAYS_OPEN_BROWSER or is_note_focused then
+    anki_connect("guiBrowse", { query = 'nid:' .. noteid })
+  end
+
+  mp.osd_message("Updated note: " .. word, 3)
+  msg.info("Updated note: " .. word)
 end
 
-local function get_extract()
+local function overwrite_cards(selected_notes, image_field, audio_field, text_field)
+  local browser_query = "nid:"
+
+  -- Use an impossible nid in the browser query to unfocus the card
+  -- Otherwise, it will cause the known issue where the card doesn't get updated
+  anki_connect("guiBrowse", { query = 'nid:1' })
+
+  for index, noteid in ipairs(selected_notes) do
+    local word = get_word(noteid)
+    update_fields(noteid, image_field, audio_field, text_field)
+
+    browser_query = browser_query .. noteid
+    if index < #selected_notes then
+      browser_query = browser_query .. ','
+    end
+
+    dlog(word .. " card was overwritten.")
+  end
+
+  anki_connect("guiBrowse", { query = browser_query })
+
+  mp.osd_message(#selected_notes .. " cards were overwritten.", 3)
+  msg.info(#selected_notes .. " cards were overwritten.")
+end
+
+local function prompt_overwrite(image_field, audio_field, text_field)
+  local selected_notes = anki_connect("guiSelectedNotes")["result"]
+
+  if #selected_notes == 0 then
+    mp.osd_message("ERR! Nothing selected for overwrite.", 3)
+    msg.error("Nothing selected for overwrite.")
+    return
+  elseif #selected_notes > OVERWRITE_LIMIT and OVERWRITE_LIMIT ~= -1 then
+    mp.osd_message("ERR! The number of selected notes exceeds the overwrite limit (" .. OVERWRITE_LIMIT .. ")", 3)
+    msg.error("The number of selected notes exceeds the overwrite limit (" .. OVERWRITE_LIMIT .. ")")
+    return
+  end
+
+  if ASK_TO_OVERWRITE ~= true then
+    overwrite_cards(selected_notes, image_field, audio_field, text_field)
+    return
+  end
+
+  if input.select == nil then
+    mp.osd_message(
+      "Error: input.select not found. Cannot ask for overwrite confirmation.\nYour MPV version may be below 0.39?",
+      10)
+    msg.error("Error: input.select not found. Cannot ask for overwrite confirmation.")
+    return
+  end
+
+  input.select({
+    prompt = "Do you want to overwrite " .. #selected_notes .. " cards? ",
+    items = {
+      "No",
+      "Yes",
+    },
+    submit = function(answer_id)
+      if answer_id == 2 then
+        overwrite_cards(selected_notes, image_field, audio_field, text_field)
+      end
+    end,
+  })
+end
+
+local function get_extract(is_overwrite)
   local lines = get_clipboard()
-  local e = 0
-  local s = 0
+  local end_time = 0
+  local start_time = 0
   for line in lines:gmatch("[^\r\n]+") do
     line = clean(line)
-    dlog(line)
-    if subs[line]~= nil then
-      if subs[line][1] ~= nil and subs[line][2] ~= nil then
-        if s == 0 then
-          s = subs[line][1]
-        else
-          s = math.min(s, subs[line][1])
-        end
-        e = math.max(e, subs[line][2])
-      end
-    else
+    dlog("Processing line: " .. line)
+
+    if not subs[line] then
       mp.osd_message("ERR! Line not found: " .. line, 3)
+      msg.error("Line not found: " .. line)
       return
     end
-  end
-  dlog(string.format('s=%d, e=%d', s, e))
-  if e ~= 0 then
-    create_screenshot(s, e)
-    create_audio(s, e)
-    local ifield = '<img src='.. get_name(s,e) ..'.' .. IMAGE_FORMAT .. '>'
-    local afield = "[sound:".. get_name(s,e) .. ".mp3]"
-    local tfield = string.gsub(string.gsub(lines,"\n+", "<br />"), "\r", "")
-    add_to_last_added(ifield, afield, tfield)
-    if AUTOPLAY_AUDIO then
-      local name = get_name(s, e)
-      local audio = utils.join_path(prefix, name .. '.mp3')
-      local cmd = {'run', 'mpv', audio, '--loop-file=no', '--load-scripts=no'}
-      mp.commandv(table.unpack(cmd))
+
+    local sub_start = subs[line][1]
+    local sub_end = subs[line][2]
+
+    if sub_start and sub_end then
+      start_time = (start_time == 0) and sub_start or math.min(start_time, sub_start)
+      end_time = math.max(end_time, sub_end)
     end
+  end
+
+  dlog(string.format('s=%d, e=%d', start_time, end_time))
+
+  if end_time == 0 then
+    mp.osd_message("ERR! No valid subtitles found.", 3)
+    msg.error("No valid subtitles found.")
+    return
+  end
+
+  create_screenshot(start_time, end_time)
+  create_audio(start_time, end_time)
+  local image_field = '<img src=' .. get_name(start_time, end_time) .. '.' .. IMAGE_FORMAT .. '>'
+  local audio_field = "[sound:" .. get_name(start_time, end_time) .. ".mp3]"
+  local text_field = string.gsub(string.gsub(lines, "\n+", "<br />"), "\r", "")
+
+  if is_overwrite ~= true then
+    add_to_last_added(image_field, audio_field, text_field)
+  else
+    prompt_overwrite(image_field, audio_field, text_field)
+  end
+
+  if AUTOPLAY_AUDIO then
+    local name = get_name(start_time, end_time)
+    local audio = utils.join_path(prefix, name .. '.mp3')
+    local cmd = { 'run', 'mpv', audio, '--loop-file=no', '--load-scripts=no' }
+    mp.commandv(table.unpack(cmd))
   end
 end
 
-local function ex()
-
+local function update_last_card()
   if not prefix or prefix == "" then
     set_media_dir()
   end
 
-  if debug_mode then
-    get_extract()
+  if not debug_mode then
+    get_extract(false)
   else
-    pcall(get_extract)
+    local success, error_msg = pcall(get_extract, false)
+    if not success then
+      mp.osd_message("Error: " .. tostring(error_msg), 5)
+      msg.error("Failed to extract: " .. tostring(error_msg))
+    end
   end
 end
 
-local function rec(...)
-  if debug_mode then
-    record_sub(...)
+local function overwrite_selected_cards()
+  if not prefix or prefix == "" then
+    set_media_dir()
+  end
+
+  if not debug_mode then
+    get_extract(true)
   else
-    pcall(record_sub, ...)
+    local success, error_msg = pcall(get_extract, true)
+    if not success then
+      mp.osd_message("Error: " .. tostring(error_msg), 5)
+      msg.error("Failed to extract: " .. tostring(error_msg))
+    end
   end
 end
 
@@ -450,9 +576,25 @@ local function toggle_sub_to_clipboard()
   mp.osd_message("Clipboard inserter " .. (ENABLE_SUBS_TO_CLIP and "activated" or "deactived"), 3)
 end
 
-local function toggle_debug_mode()
-  debug_mode = not debug_mode
-  mp.osd_message("Debug mode " .. (debug_mode and "activated" or "deactived"), 3)
+
+mp.add_key_binding("ctrl+v", "update-anki-card", update_last_card)
+mp.add_key_binding("ctrl+r", "overwrite-anki-cards", overwrite_selected_cards)
+mp.add_key_binding("ctrl+t", "toggle-clipboard-insertion", toggle_sub_to_clipboard)
+mp.add_key_binding("ctrl+V", update_last_card)
+mp.add_key_binding("ctrl+R", overwrite_selected_cards)
+mp.add_key_binding("ctrl+T", toggle_sub_to_clipboard)
+
+---------------------------------------
+-- Initialize subtitle recording
+local function rec(...)
+  if debug_mode then
+    record_sub(...)
+  else
+    local success, error_msg = pcall(record_sub, ...)
+    if not success then
+      msg.error("Failed to record subtitle: " .. tostring(error_msg))
+    end
+  end
 end
 
 local function clear_subs(_)
@@ -461,10 +603,4 @@ end
 
 mp.observe_property("sub-text", 'string', rec)
 mp.observe_property("filename", "string", clear_subs)
-
-mp.add_key_binding("ctrl+v", "update-anki-card", ex)
-mp.add_key_binding("ctrl+t", "toggle-clipboard-insertion", toggle_sub_to_clipboard)
-mp.add_key_binding("ctrl+d", "toggle-debug-mode", toggle_debug_mode)
-mp.add_key_binding("ctrl+V", ex)
-mp.add_key_binding("ctrl+T", toggle_sub_to_clipboard)
-mp.add_key_binding("ctrl+D", toggle_debug_mode)
+-----------------------------------------------------------------
