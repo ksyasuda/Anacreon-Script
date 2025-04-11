@@ -359,9 +359,11 @@ local function create_screenshot(start_time, end_time)
     table.insert(cmd, '--ovcopts-add=preset=drawing')
   elseif IMAGE_FORMAT == 'png' then
     table.insert(cmd, '--vf-add=format=rgb24')
+    table.insert(cmd, '--ovc=png')
   end
   table.insert(cmd, '--vf-add=scale=480*iw*sar/ih:480')
   table.insert(cmd, string.format('--start=%.3f', mp.get_property_number("time-pos")))
+  table.insert(cmd, '--ofopts-add=update=1')
   table.insert(cmd, string.format('-o=%s', img))
   mp.commandv(table.unpack(cmd))
   dlog(utils.to_string(cmd))
@@ -542,7 +544,7 @@ local function update_last_card()
     set_media_dir()
   end
 
-  if debug_mode then
+  if not debug_mode then
     get_extract(false)
   else
     local success, error_msg = pcall(get_extract, false)
@@ -558,8 +560,8 @@ local function overwrite_selected_cards()
     set_media_dir()
   end
 
-  if debug_mode then
-    get_extract(false)
+  if not debug_mode then
+    get_extract(true)
   else
     local success, error_msg = pcall(get_extract, true)
     if not success then
