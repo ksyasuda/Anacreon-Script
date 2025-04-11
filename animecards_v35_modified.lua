@@ -368,7 +368,7 @@ local function update_fields(noteid, ifield, afield, tfield)
   })
 end
 
-function get_word(noteid)
+local function get_word(noteid)
   local note = anki_connect('notesInfo', {notes={noteid}})
   local word = note["result"][1]["fields"][FRONT_FIELD]["value"]
   return word
@@ -520,7 +520,11 @@ local function ex(is_overwrite)
   if debug_mode then
     get_extract(is_overwrite)
   else
-    pcall(get_extract, is_overwrite)
+    local success, error_msg = pcall(get_extract, is_overwrite)
+    if not success then
+      mp.osd_message("Error: " .. tostring(error_msg), 5)
+      msg.error("Failed to extract: " .. tostring(error_msg))
+    end
   end
 end
 
@@ -528,7 +532,10 @@ local function rec(...)
   if debug_mode then
     record_sub(...)
   else
-    pcall(record_sub, ...)
+    local success, error_msg = pcall(record_sub, ...)
+    if not success then
+      msg.error("Failed to record subtitle: " .. tostring(error_msg))
+    end
   end
 end
 
