@@ -77,21 +77,22 @@ local function dlog(...)
 end
 
 local function clean(s)
-  for _, ws in ipairs({'%s', ' ', '᠎', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '​', ' ', ' ', '　', '﻿', '‪'}) do
-    s = s:gsub(ws..'+', "")
+  for _, ws in ipairs({ '%s', ' ', '᠎', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '​', ' ', ' ', '　', '﻿', '‪' }) do
+    s = s:gsub(ws .. '+', "")
   end
   return s
 end
 
 local function get_name(s, e)
-  return mp.get_property("filename"):gsub('%W','').. tostring(s) .. tostring(e)
+  return mp.get_property("filename"):gsub('%W', '') .. tostring(s) .. tostring(e)
 end
 
 local function get_clipboard()
   local res
   if platform == 'windows' then
-    res = utils.subprocess({ args = {
-      'powershell', '-NoProfile', '-Command', [[& {
+    res = utils.subprocess({
+      args = {
+        'powershell', '-NoProfile', '-Command', [[& {
         Trap {
           Write-Error -ErrorRecord $_
           Exit 1
@@ -107,13 +108,16 @@ local function get_clipboard()
         $u8clip = [System.Text.Encoding]::UTF8.GetBytes($clip)
         [Console]::OpenStandardOutput().Write($u8clip, 0, $u8clip.Length)
       }]]
-    } })
+      }
+    })
   elseif platform == 'macos' then
     return io.popen('LANG=en_US.UTF-8 pbpaste'):read("*a")
   else
-    res = utils.subprocess({ args = {
-      'xclip', '-selection', 'clipboard', '-out'
-    } })
+    res = utils.subprocess({
+      args = {
+        'xclip', '-selection', 'clipboard', '-out'
+      }
+    })
   end
   if not res.error then
     return res.stdout
@@ -121,9 +125,11 @@ local function get_clipboard()
 end
 
 local function powershell_set_clipboard(text)
-  utils.subprocess({ args = {
-    'powershell', '-NoProfile', '-Command', [[Set-Clipboard -Value @"]] .. "\n" .. text .. "\n" .. [["@]]
-  }})
+  utils.subprocess({
+    args = {
+      'powershell', '-NoProfile', '-Command', [[Set-Clipboard -Value @"]] .. "\n" .. text .. "\n" .. [["@]]
+    }
+  })
 end
 
 local function cmd_set_clipboard(text)
@@ -153,7 +159,8 @@ local function record_sub(_, text)
       return
     end
 
-    subs[newtext] = { mp.get_property_number('sub-start') + sub_delay - audio_delay, mp.get_property_number('sub-end') + sub_delay - audio_delay }
+    subs[newtext] = { mp.get_property_number('sub-start') + sub_delay - audio_delay, mp.get_property_number('sub-end') +
+    sub_delay - audio_delay }
     dlog(string.format("%s -> %s : %s", subs[newtext][1], subs[newtext][2], newtext))
     if enable_subs_to_clip then
       -- Remove newlines from text before sending it to clipboard.
@@ -193,27 +200,26 @@ local function clean_audio(filename)
   )
   local args
   if platform == 'windows' then
-    args = {'powershell', '-NoProfile', '-Command', [[& {
+    args = { 'powershell', '-NoProfile', '-Command', [[& {
       while (!(Test-Path "]] .. destination .. [[")) { Start-Sleep -Milliseconds 100 }
       }]]
     }
     utils.subprocess({ args = args, capture_stderr = true })
-    args = {'powershell', '-NoProfile', '-Command', [[& {
+    args = { 'powershell', '-NoProfile', '-Command', [[& {
       mv -Force "]] .. destination .. [[" "]] .. filename .. [["
       }]]
     }
     utils.subprocess({ args = args, capture_stderr = true })
   else
-    args = {'/bin/sh', '-c', [[
-until [ -f "]] .. destination .. [[" ] ; do sleep 1; done ]]}
+    args = { '/bin/sh', '-c', [[
+until [ -f "]] .. destination .. [[" ] ; do sleep 1; done ]] }
     utils.subprocess({ args = args, capture_stderr = true })
-    args = {'mv', destination, filename}
+    args = { 'mv', destination, filename }
     utils.subprocess({ args = args, capture_stderr = true })
   end
 end
 
 local function create_audio(s, e)
-
   if s == nil or e == nil then
     return
   end
@@ -262,7 +268,7 @@ end
 
 local function create_screenshot(s, e)
   local source = mp.get_property("path")
-  local img = utils.join_path(prefix, get_name(s,e) .. '.' .. IMAGE_FORMAT)
+  local img = utils.join_path(prefix, get_name(s, e) .. '.' .. IMAGE_FORMAT)
 
   local cmd = {
     'run',
@@ -290,18 +296,19 @@ local function create_screenshot(s, e)
 end
 
 local function anki_connect(action, params)
-  local request = utils.format_json({action=action, params=params, version=6})
+  local request = utils.format_json({ action = action, params = params, version = 6 })
   local args
   if platform == 'windows' then
     args = {
       'powershell', '-NoProfile', '-Command', [[& {
-      $data = Invoke-RestMethod -Uri http://127.0.0.1:8765 -Method Post -ContentType 'application/json; charset=UTF-8' -Body @"]] .. "\n" .. request .. "\n" .. [["@ | ConvertTo-Json -Depth 10
+      $data = Invoke-RestMethod -Uri http://127.0.0.1:8765 -Method Post -ContentType 'application/json; charset=UTF-8' -Body @"]] ..
+    "\n" .. request .. "\n" .. [["@ | ConvertTo-Json -Depth 10
       $u8data = [System.Text.Encoding]::UTF8.GetBytes($data)
       [Console]::OpenStandardOutput().Write($u8data, 0, $u8data.Length)
       }]]
     }
   else
-    args = {'curl', '-s', 'localhost:8765', '-X', 'POST', '-d', request}
+    args = { 'curl', '-s', 'localhost:8765', '-X', 'POST', '-d', request }
   end
 
   local result = utils.subprocess({ args = args, cancellable = true, capture_stderr = true })
@@ -326,16 +333,16 @@ end
 local function get_forvo_audio(word)
   local function b64dec(data)
     local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-    data = string.gsub(data, '[^'..b..'=]', '')
+    data = string.gsub(data, '[^' .. b .. '=]', '')
     return (data:gsub('.', function(x)
       if (x == '=') then return '' end
-      local r,f='',(b:find(x)-1)
-      for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and '1' or '0') end
+      local r, f = '', (b:find(x) - 1)
+      for i = 6, 1, -1 do r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and '1' or '0') end
       return r;
     end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
       if (#x ~= 8) then return '' end
-      local c=0
-      for i=1,8 do c=c+(x:sub(i,i)=='1' and 2^(8-i) or 0) end
+      local c = 0
+      for i = 1, 8 do c = c + (x:sub(i, i) == '1' and 2 ^ (8 - i) or 0) end
       return string.char(c)
     end))
   end
@@ -373,8 +380,10 @@ local function get_forvo_audio(word)
       '-H', 'cache-control: no-cache',
       '-H', 'dnt: 1',
       '-H', 'upgrade-insecure-requests: 1',
-      '-H', 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
-      '-H', 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+      '-H',
+      'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36',
+      '-H',
+      'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
       '-H', 'sec-fetch-site: same-origin',
       '-H', 'sec-fetch-mode: navigate',
       '-H', 'sec-fetch-user: ?1',
@@ -401,11 +410,12 @@ local function get_forvo_audio(word)
     args = {
       'powershell', '-NoProfile', '-Command', [[& {
       [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-      Invoke-WebRequest -Uri "]] .. audio_url .. [[" -OutFile "]] .. utils.join_path(prefix, "forvo_" .. word .. '.mp3') .. [["
+      Invoke-WebRequest -Uri "]] ..
+    audio_url .. [[" -OutFile "]] .. utils.join_path(prefix, "forvo_" .. word .. '.mp3') .. [["
     }]]
     }
   else
-    args = {'curl', audio_url, '-o',  utils.join_path(prefix, "forvo_" .. word .. '.mp3')}
+    args = { 'curl', audio_url, '-o', utils.join_path(prefix, "forvo_" .. word .. '.mp3') }
   end
 
   utils.subprocess({ args = args, cancellable = true, capture_stderr = true })
@@ -416,24 +426,24 @@ local function get_forvo_audio(word)
   return utils.join_path(prefix, "forvo_" .. word .. '.mp3')
 end
 
-local function add_to_last_added(ifield, afield, tfield)
+local function add_to_last_added(image_field, audio_field, text_field)
   local forvo_path = nil
-  local added_notes = anki_connect('findNotes', {query='added:1'})["result"]
+  local added_notes = anki_connect('findNotes', { query = 'added:1' })["result"]
   table.sort(added_notes)
   local noteid = added_notes[#added_notes]
-  local note = anki_connect('notesInfo', {notes={noteid}})
+  local note = anki_connect('notesInfo', { notes = { noteid } })
 
   if note ~= nil then
     local word = note["result"][1]["fields"][FRONT_FIELD]["value"]
     local new_fields = {
-      [SENTENCE_AUDIO_FIELD]=afield,
-      [SENTENCE_FIELD]=tfield,
-      [IMAGE_FIELD]=ifield
+      [SENTENCE_AUDIO_FIELD] = audio_field,
+      [SENTENCE_FIELD] = text_field,
+      [IMAGE_FIELD] = image_field
     }
 
     if WORD_AUDIO_FIELD ~= "" then
-      local wafield = note["result"][1]["fields"][WORD_AUDIO_FIELD]["value"]
-      if wafield == "" then
+      local waudio_field = note["result"][1]["fields"][WORD_AUDIO_FIELD]["value"]
+      if waudio_field == "" then
         local success, res = pcall(get_forvo_audio, word)
         if success then
           forvo_path = res
@@ -443,9 +453,9 @@ local function add_to_last_added(ifield, afield, tfield)
     end
 
     anki_connect('updateNoteFields', {
-      note={
-        id=noteid,
-        fields=new_fields
+      note = {
+        id = noteid,
+        fields = new_fields
       }
     })
 
@@ -463,7 +473,7 @@ local function get_extract()
   for line in lines:gmatch("[^\r\n]+") do
     line = clean(line)
     dlog(line)
-    if subs[line]~= nil then
+    if subs[line] ~= nil then
       if subs[line][1] ~= nil and subs[line][2] ~= nil then
         if s == 0 then
           s = subs[line][1]
@@ -481,14 +491,14 @@ local function get_extract()
   if e ~= 0 then
     create_screenshot(s, e)
     create_audio(s, e)
-    local ifield = '<img src='.. get_name(s,e) ..'.' .. IMAGE_FORMAT .. '>'
-    local afield = "[sound:".. get_name(s,e) .. ".mp3]"
-    local tfield = string.gsub(string.gsub(lines,"\n+", "<br />"), "\r", "")
-    local forvo_path = add_to_last_added(ifield, afield, tfield)
+    local image_field = '<img src=' .. get_name(s, e) .. '.' .. IMAGE_FORMAT .. '>'
+    local audio_field = "[sound:" .. get_name(s, e) .. ".mp3]"
+    local text_field = string.gsub(string.gsub(lines, "\n+", "<br />"), "\r", "")
+    local forvo_path = add_to_last_added(image_field, audio_field, text_field)
     if AUTOPLAY_AUDIO then
       local name = get_name(s, e)
       local audio = utils.join_path(prefix, name .. '.mp3')
-      local cmd = {'run', 'mpv'}
+      local cmd = { 'run', 'mpv' }
       if forvo_path ~= nil then
         table.insert(cmd, forvo_path)
       end
