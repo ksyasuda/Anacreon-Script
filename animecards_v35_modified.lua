@@ -544,11 +544,6 @@ local function toggle_sub_to_clipboard()
   mp.osd_message("Clipboard inserter " .. (ENABLE_SUBS_TO_CLIP and "activated" or "deactived"), 3)
 end
 
-local function toggle_debug_mode()
-  debug_mode = not debug_mode
-  mp.osd_message("Debug mode " .. (debug_mode and "activated" or "deactived"), 3)
-end
-
 local function clear_subs(_)
   subs = {}
 end
@@ -557,11 +552,7 @@ mp.observe_property("sub-text", 'string', rec)
 mp.observe_property("filename", "string", clear_subs)
 
 mp.add_key_binding("ctrl+v", "update-anki-card", ex)
--- I can't pass a function with arguments directly to add_key_binding
--- therefore an anonymous wrapper is used
 mp.add_key_binding("ctrl+r", "overwrite-anki-cards", function() ex(true) end)
 mp.add_key_binding("ctrl+t", "toggle-clipboard-insertion", toggle_sub_to_clipboard)
-mp.add_key_binding("ctrl+d", "toggle-debug-mode", toggle_debug_mode)
 mp.add_key_binding("ctrl+V", ex)
 mp.add_key_binding("ctrl+T", toggle_sub_to_clipboard)
-mp.add_key_binding("ctrl+D", toggle_debug_mode)
