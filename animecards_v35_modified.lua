@@ -281,7 +281,7 @@ local function record_sub(_, text)
       'sub-end') +
     sub_delay - audio_delay }
     dlog(string.format("%s -> %s : %s", subs[newtext][1], subs[newtext][2], newtext))
-    if ENABLE_SUBS_TO_CLIP then
+    if ENABLE_SUBS_TO_CLIP == true then
       -- Remove newlines from text before sending it to clipboard.
       -- This way pressing control+v without copying from texthooker page
       -- will always give last line.
@@ -415,7 +415,7 @@ local function add_to_last_added(image_field, audio_field, text_field)
 
   update_fields(noteid, image_field, audio_field, text_field)
 
-  if ALWAYS_OPEN_BROWSER or is_note_focused then
+  if ALWAYS_OPEN_BROWSER == true or is_note_focused == true then
     anki_connect("guiBrowse", { query = 'nid:' .. noteid })
   end
 
@@ -531,7 +531,7 @@ local function get_extract(is_overwrite)
     prompt_overwrite(image_field, audio_field, text_field)
   end
 
-  if AUTOPLAY_AUDIO then
+  if AUTOPLAY_AUDIO == true then
     local name = get_name(start_time, end_time)
     local audio = utils.join_path(prefix, name .. '.mp3')
     local cmd = { 'run', 'mpv', audio, '--loop-file=no', '--load-scripts=no' }
