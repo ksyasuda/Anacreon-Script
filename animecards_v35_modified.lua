@@ -414,7 +414,7 @@ local function create_miscinfo_text(start_time)
     ["%%t"] = format_time(start_time),
     ["%%T"] = format_time(start_time, true),
   }
-  
+
   for placeholder, value in pairs(replacements) do
     text = text:gsub(placeholder, value)
   end
