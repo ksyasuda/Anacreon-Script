@@ -59,6 +59,20 @@ local ASK_TO_OVERWRITE = true
 -- Limits the number of cards that can be overwritten at once
 -- Set to -1 to disable the limit (Not recommended)
 local OVERWRITE_LIMIT = 8
+-- Set to true if you want to save misc information
+local WRITE_MISCINFO = false
+-- Field where the misc information will be written
+-- Has no effect if WRITE_MISCINFO is set to false
+local MISCINFO_FIELD = "MiscInfo"
+-- Pattern for the content of misc info field
+--  %f - filename (without extension)
+--  %F - filename (with extension)
+--  %t - timestamp (HH:MM:SS), hours will be omitted if not present
+--  %T - timestamp with milliseconds (HH:MM:SS:MSS)
+--  <br> - line break
+-- local MISCINFO_PATTERN = "%f (%t)"
+-- local MISCINFO_PATTERN = "File: %F<br>Timestamp: %T"
+local MISCINFO_PATTERN = "[Anacreon Script] %f (%t)"
 
 ---------------------------------------
 
@@ -290,6 +304,28 @@ local function record_sub(_, text)
   end
 end
 
+local function format_time(raw_seconds, are_ms_needed)
+  local hours = math.floor(raw_seconds / 3600)
+  local minutes = math.floor((raw_seconds % 3600) / 60)
+  local seconds = math.floor(raw_seconds % 60)
+  local milliseconds = math.floor((raw_seconds * 1000) % 1000)
+
+  -- MM:SS
+  local formatted_time = string.format("%02d:%02d", minutes, seconds)
+
+  -- HH:MM:SS
+  if hours > 0 then
+    formatted_time = string.format("%02d:", hours) .. formatted_time
+  end
+
+  -- HH:MM:SS:MSS
+  if are_ms_needed == true then
+    formatted_time = formatted_time .. string.format(":%03d", milliseconds)
+  end
+
+  return formatted_time
+end
+
 local function create_audio(start_time, end_time)
   if start_time == nil or end_time == nil then
     return
@@ -369,13 +405,33 @@ local function create_screenshot(start_time, end_time)
   dlog(utils.to_string(cmd))
 end
 
+local function create_miscinfo_text(start_time)
+  local text = MISCINFO_PATTERN
 
-local function update_fields(noteid, image_field, audio_field, text_field)
-  local new_fields = {
-    [IMAGE_FIELD] = image_field,
-    [SENTENCE_AUDIO_FIELD] = audio_field,
-    [SENTENCE_FIELD] = text_field
+  local replacements = {
+    ["%%f"] = mp.get_property("filename/no-ext"),
+    ["%%F"] = mp.get_property("filename"),
+    ["%%t"] = format_time(start_time),
+    ["%%T"] = format_time(start_time, true),
   }
+  
+  for placeholder, value in pairs(replacements) do
+    text = text:gsub(placeholder, value)
+  end
+
+  return text
+end
+
+local function update_fields(noteid, fields)
+  local new_fields = {
+    [IMAGE_FIELD] = fields.image,
+    [SENTENCE_AUDIO_FIELD] = fields.audio,
+    [SENTENCE_FIELD] = fields.sentence
+  }
+
+  if WRITE_MISCINFO == true and fields.miscinfo then
+    new_fields[MISCINFO_FIELD] = fields.miscinfo
+  end
 
   anki_connect('updateNoteFields', {
     note = {
@@ -392,7 +448,7 @@ local function get_word(noteid)
 end
 
 
-local function add_to_last_added(image_field, audio_field, text_field)
+local function add_to_last_added(fields)
   local added_notes = anki_connect('findNotes', { query = 'added:1' })["result"]
   table.sort(added_notes)
   local noteid = added_notes[#added_notes]
@@ -413,7 +469,7 @@ local function add_to_last_added(image_field, audio_field, text_field)
 
   local word = get_word(noteid)
 
-  update_fields(noteid, image_field, audio_field, text_field)
+  update_fields(noteid, fields)
 
   if ALWAYS_OPEN_BROWSER == true or is_note_focused == true then
     anki_connect("guiBrowse", { query = 'nid:' .. noteid })
@@ -423,7 +479,7 @@ local function add_to_last_added(image_field, audio_field, text_field)
   msg.info("Updated note: " .. word)
 end
 
-local function overwrite_cards(selected_notes, image_field, audio_field, text_field)
+local function overwrite_cards(selected_notes, fields)
   local browser_query = "nid:"
 
   -- Use an impossible nid in the browser query to unfocus the card
@@ -432,7 +488,7 @@ local function overwrite_cards(selected_notes, image_field, audio_field, text_fi
 
   for index, noteid in ipairs(selected_notes) do
     local word = get_word(noteid)
-    update_fields(noteid, image_field, audio_field, text_field)
+    update_fields(noteid, fields)
 
     browser_query = browser_query .. noteid
     if index < #selected_notes then
@@ -448,7 +504,7 @@ local function overwrite_cards(selected_notes, image_field, audio_field, text_fi
   msg.info(#selected_notes .. " cards were overwritten.")
 end
 
-local function prompt_overwrite(image_field, audio_field, text_field)
+local function prompt_overwrite(fields)
   local selected_notes = anki_connect("guiSelectedNotes")["result"]
 
   if #selected_notes == 0 then
@@ -462,7 +518,7 @@ local function prompt_overwrite(image_field, audio_field, text_field)
   end
 
   if ASK_TO_OVERWRITE ~= true then
-    overwrite_cards(selected_notes, image_field, audio_field, text_field)
+    overwrite_cards(selected_notes, fields)
     return
   end
 
@@ -482,7 +538,7 @@ local function prompt_overwrite(image_field, audio_field, text_field)
     },
     submit = function(answer_id)
       if answer_id == 2 then
-        overwrite_cards(selected_notes, image_field, audio_field, text_field)
+        overwrite_cards(selected_notes, fields)
       end
     end,
   })
@@ -521,14 +577,21 @@ local function get_extract(is_overwrite)
 
   create_screenshot(start_time, end_time)
   create_audio(start_time, end_time)
-  local image_field = '<img src=' .. get_name(start_time, end_time) .. '.' .. IMAGE_FORMAT .. '>'
-  local audio_field = "[sound:" .. get_name(start_time, end_time) .. ".mp3]"
-  local text_field = string.gsub(string.gsub(lines, "\n+", "<br />"), "\r", "")
+
+  local fields = {
+    image = '<img src=' .. get_name(start_time, end_time) .. '.' .. IMAGE_FORMAT .. '>',
+    audio = "[sound:" .. get_name(start_time, end_time) .. ".mp3]",
+    sentence = string.gsub(string.gsub(lines, "\n+", "<br>"), "\r", "")
+  }
+
+  if WRITE_MISCINFO == true then
+    fields.miscinfo = create_miscinfo_text(start_time)
+  end
 
   if is_overwrite ~= true then
-    add_to_last_added(image_field, audio_field, text_field)
+    add_to_last_added(fields)
   else
-    prompt_overwrite(image_field, audio_field, text_field)
+    prompt_overwrite(fields)
   end
 
   if AUTOPLAY_AUDIO == true then
