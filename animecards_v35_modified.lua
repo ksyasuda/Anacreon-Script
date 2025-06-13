@@ -28,7 +28,7 @@
 
 local utils = require 'mp.utils'
 local msg = require 'mp.msg'
-local input = require 'mp.input'
+local is_input_exists, input = pcall(require, 'mp.input')
 
 ------------- User Config -------------
 -- Set these to match your field names in Anki
@@ -111,7 +111,7 @@ local function dlog(...)
   end
 end
 
-local function verfiy_libmp3lame()
+local function verify_libmp3lame()
   local encoderlist = mp.get_property("encoder-list")
   if not encoderlist or not string.find(encoderlist, "libmp3lame") then
     mp.osd_message(
@@ -123,7 +123,7 @@ local function verfiy_libmp3lame()
   end
 end
 
-mp.register_event("file-loaded", verfiy_libmp3lame)
+mp.register_event("file-loaded", verify_libmp3lame)
 
 dlog("Detected Platform: " .. platform)
 dlog("Detected display server: " .. display_server)
@@ -541,6 +541,14 @@ local function overwrite_cards(selected_notes, fields)
 end
 
 local function prompt_overwrite(fields)
+  if is_input_exists ~= true or type(input) ~= 'table' or type(input.select) ~= "function" then
+    mp.osd_message(
+      "Error: input.select not found. Cannot ask for overwrite confirmation.\nYour MPV version may be below 0.39?",
+      10)
+    msg.error("Error: input.select not found. Cannot ask for overwrite confirmation.")
+    return
+  end
+  
   local selected_notes = anki_connect("guiSelectedNotes")["result"]
 
   if #selected_notes == 0 then
@@ -555,14 +563,6 @@ local function prompt_overwrite(fields)
 
   if ASK_TO_OVERWRITE ~= true then
     overwrite_cards(selected_notes, fields)
-    return
-  end
-
-  if input.select == nil then
-    mp.osd_message(
-      "Error: input.select not found. Cannot ask for overwrite confirmation.\nYour MPV version may be below 0.39?",
-      10)
-    msg.error("Error: input.select not found. Cannot ask for overwrite confirmation.")
     return
   end
 
