@@ -83,13 +83,13 @@ local subs = {}
 local debug_mode = true
 local use_powershell_clipboard = nil
 local prefix = ""
+local o = {}
 ---------------------------------------
 
 
 ------------- Setup -------------
 if unpack ~= nil then table.unpack = unpack end
 
-local o = {}
 -- Possible platforms: windows, linux, macos
 local platform = mp.get_property_native("platform")
 if platform == "darwin" then
@@ -435,14 +435,14 @@ local function save_word_highlight(mpv_sentence, noteid)
   end
 
   local anki_sentence = get_field_value(noteid, SENTENCE_FIELD)
-  
+
   if anki_sentence == nil or anki_sentence == '' then
     return mpv_sentence
   elseif mpv_sentence == nil or mpv_sentence == '' then
     return anki_sentence
   end
 
-  -- Looking for content of tag <b> 
+  -- Looking for content of tag <b>
   local highlighted_text = anki_sentence:match("^.-<b>(.-)</b>.-$")
 
   if not highlighted_text or highlighted_text == '' then
@@ -450,10 +450,10 @@ local function save_word_highlight(mpv_sentence, noteid)
   end
 
   dlog("Found highlighted text: " .. tostring(highlighted_text))
-  
+
   local pattern = string.format("^(.-)%s(.-)$", highlighted_text)
   local prefix, suffix = mpv_sentence:match(pattern)
-  
+
   if prefix and suffix then
     local new_sentence = string.format("%s<b>%s</b>%s",
       prefix, highlighted_text, suffix)
@@ -548,7 +548,7 @@ local function prompt_overwrite(fields)
     msg.error("Error: input.select not found. Cannot ask for overwrite confirmation.")
     return
   end
-  
+
   local selected_notes = anki_connect("guiSelectedNotes")["result"]
 
   if #selected_notes == 0 then
@@ -589,7 +589,9 @@ local function get_extract(is_overwrite)
     dlog("Processing line: " .. line)
 
     if not subs[line] then
-      mp.osd_message("ERR! Line not found: " .. line, 3)
+      mp.osd_message("ERR! Line not found: " ..
+        line .. "\nIf you're using Renji's texthooker disable the opiton 'Preserve Whitespace'." ..
+        "\nThis is an issue with multi line subs that will be addressed in the future.", 8)
       msg.error("Line not found: " .. line)
       return
     end
