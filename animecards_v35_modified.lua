@@ -46,6 +46,7 @@ local AUTOPLAY_AUDIO = false
 -- Optional screenshot image format. Valid options: "webp" or "png"
 -- Change to "png" if you plan to view cards on iOS or Mac.
 local IMAGE_FORMAT = "png"
+local IMAGE_SIZE = 480
 -- Optional set to true if you want your volume in mpv to affect Anki card volume.
 local USE_MPV_VOLUME = false
 -- Set to true if you want writing to clipboard to be enabled by default.
@@ -399,7 +400,7 @@ local function create_screenshot(start_time, end_time)
     table.insert(cmd, '--vf-add=format=rgb24')
     table.insert(cmd, '--ovc=png')
   end
-  table.insert(cmd, '--vf-add=scale=480*iw*sar/ih:480')
+  table.insert(cmd, string.format('--vf-add=scale=%d*iw*sar/ih:%d', IMAGE_SIZE))
   table.insert(cmd, string.format('--start=%.3f', mp.get_property_number("time-pos")))
   table.insert(cmd, '--ofopts-add=update=1')
   table.insert(cmd, string.format('-o=%s', img))
