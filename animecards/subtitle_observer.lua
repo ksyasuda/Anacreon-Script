@@ -1,0 +1,84 @@
+local msg = require 'mp.msg'
+
+local clip = require 'clipboard'
+local opts = require 'script_options'
+local tools = require 'tools'
+
+local subtitle_observer = {}
+local subs = {}
+
+-- Removes various whitespace and invisible characters from a string
+local function clean(str)
+  for _, ws in ipairs({ '%s', ' ', '᠎', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '​', ' ', ' ', '　', '﻿', '‪' }) do
+    str = str:gsub(ws .. '+', "")
+  end
+
+  return str
+end
+
+function subtitle_observer.record(_, text)
+  local sub_start = mp.get_property_number('sub-start')
+  local sub_end = mp.get_property_number('sub-end')
+
+  if not text and not sub_start and not sub_end then
+    return
+  end
+
+  local sub_delay = mp.get_property_native("sub-delay")
+  local audio_delay = mp.get_property_native("audio-delay")
+  local newtext = clean(text)
+
+  if newtext == '' then
+    return
+  end
+
+  subs[newtext] = { sub_start + sub_delay - audio_delay, sub_end + sub_delay - audio_delay }
+
+  tools.dlog(string.format("%s -> %s : %s", subs[newtext][1], subs[newtext][2], newtext))
+
+  if opts.ENABLE_SUBS_TO_CLIP == true then
+    clip.set(text)
+  end
+end
+
+function subtitle_observer.clear()
+  subs = {}
+end
+
+-- Given multiple lines (from clipboard), calculates the
+-- combined time range that includes matched subtitles.
+function subtitle_observer.specify_range(lines)
+  local range_start = 0
+  local range_end = 0
+
+  for line in lines:gmatch("[^\r\n]+") do
+    line = clean(line)
+    tools.dlog("Processing line: " .. line)
+
+    if not subs[line] then
+      mp.osd_message("ERR! Line not found: " .. line, 3)
+      msg.error("Line not found: " .. line)
+      return
+    end
+
+    local sub_start = subs[line][1]
+    local sub_end = subs[line][2]
+
+    if sub_start and sub_end then
+      range_start = (range_start == 0) and sub_start or math.min(range_start, sub_start)
+      range_end = math.max(range_end, sub_end)
+    end
+  end
+
+  tools.dlog(string.format('Lines range: %.3f -> %.3f', range_start, range_end))
+
+  if range_end == 0 then
+    mp.osd_message("ERR! No valid subtitles found.", 3)
+    msg.error("No valid subtitles found.")
+    return
+  end
+
+  return range_start, range_end
+end
+
+return subtitle_observer
