@@ -59,9 +59,10 @@ function encoder.verify_libmp3lame()
 end
 
 -- Generates a filename (without extension) for both audio and image.
--- Removes non-word characters using gsub and appends timing.
+-- Removes non-word characters using gsub and appends timings.
 function encoder.gen_name(start_time, end_time)
-  return mp.get_property("filename"):gsub('%W', '') .. tostring(start_time) .. tostring(end_time)
+  local stem = mp.get_property("filename/no-ext"):gsub('%W', '')
+  return string.format('%s_%.3f_%.3f', stem, start_time, end_time)
 end
 
 function encoder.create_audio(name, start_time, end_time)
