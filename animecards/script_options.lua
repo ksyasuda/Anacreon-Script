@@ -18,8 +18,9 @@ opts.HIGHLIGHT_WORD = false
 -- Audio settings
 opts.AUDIO_CLIP_FADE = 0.2     -- seconds
 opts.AUDIO_CLIP_PADDING = 0.75 -- seconds
-opts.AUTOPLAY_AUDIO = false
+opts.AUDIO_MONO = true
 opts.USE_MPV_VOLUME = false
+opts.AUTOPLAY_AUDIO = false
 
 -- Image settings
 opts.IMAGE_FORMAT = "png" -- png | webp

@@ -76,14 +76,15 @@ function encoder.create_audio(name, start_time, end_time)
   end
 
   local volume = opts.USE_MPV_VOLUME and mp.get_property('volume') or '100'
+  local channels = opts.AUDIO_MONO and '1' or 'auto'
   local fadein_arg = gen_fade_arg('in', 'ipar', start_time)
   local fadeout_arg = gen_fade_arg('out', 'ipar', start_time + audio_length - fade_duration)
   local output = utils.join_path(anki.get_media_dir(), name .. '.mp3')
 
   local cmd = {
     'run', 'mpv', source, '--loop-file=no',
-    '--video=no', '--no-ocopy-metadata',
-    '--no-sub', '--audio-channels=1',
+    '--video=no', '--no-ocopy-metadata', '--no-sub',
+    string.format('--audio-channels=%s', channels),
     string.format('--start=%.3f', start_time),
     string.format('--length=%.3f', audio_length),
     string.format('--aid=%s', audio_id),
