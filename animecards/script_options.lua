@@ -13,6 +13,7 @@ opts.IMAGE_FIELD = "Picture"
 opts.ENABLE_SUBS_TO_CLIP = false
 opts.ASK_TO_OVERWRITE = true
 opts.OVERWRITE_LIMIT = 8 -- -1 turns off the Limit
+opts.HIGHLIGHT_WORD = false
 
 -- Audio settings
 opts.AUDIO_CLIP_FADE = 0.2     -- seconds
