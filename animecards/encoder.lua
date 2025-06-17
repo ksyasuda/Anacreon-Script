@@ -119,6 +119,7 @@ function encoder.create_image(name, timing)
     '--no-sub', '--frames=1',
   }
 
+  -- Determining format
   if opts.IMAGE_FORMAT == 'webp' then
     table.insert(cmd, '--ovc=libwebp')
     table.insert(cmd, '--ovcopts-add=lossless=0')
@@ -133,7 +134,12 @@ function encoder.create_image(name, timing)
     table.insert(cmd, gen_jpg_quality_arg(opts.JPG_QUALITY))
   end
 
-  table.insert(cmd, '--vf-add=scale=480*iw*sar/ih:480')
+  -- Determining resolution
+  if opts.IMAGE_HEIGHT > 0 then
+    table.insert(cmd, string.format('--vf-add=scale=%d*iw*sar/ih:%d',
+      opts.IMAGE_HEIGHT, opts.IMAGE_HEIGHT))
+  end
+
   table.insert(cmd, string.format('--start=%.3f', timing))
   table.insert(cmd, '--ofopts-add=update=1')
   table.insert(cmd, string.format('-o=%s', output))

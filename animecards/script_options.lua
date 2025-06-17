@@ -24,6 +24,7 @@ opts.AUTOPLAY_AUDIO = false
 
 -- Image settings
 opts.IMAGE_FORMAT = "png" -- png | jpg | webp
+opts.IMAGE_HEIGHT = 480   -- if 0 then don't scale
 opts.JPG_QUALITY = 80     -- 0-100
 
 -- Misc info settings
