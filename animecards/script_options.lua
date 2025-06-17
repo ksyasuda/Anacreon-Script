@@ -12,7 +12,7 @@ opts.IMAGE_FIELD = "Picture"
 -- Behavior settings
 opts.ENABLE_SUBS_TO_CLIP = false
 opts.ASK_TO_OVERWRITE = true
-opts.OVERWRITE_LIMIT = 8 -- -1 turns off the Limit
+opts.OVERWRITE_LIMIT = 8 -- negative 1 turns off the Limit
 opts.HIGHLIGHT_WORD = false
 
 -- Audio settings
@@ -23,7 +23,8 @@ opts.USE_MPV_VOLUME = false
 opts.AUTOPLAY_AUDIO = false
 
 -- Image settings
-opts.IMAGE_FORMAT = "png" -- png | webp
+opts.IMAGE_FORMAT = "png" -- png | jpg | webp
+opts.JPG_QUALITY = 80     -- 0-100
 
 -- Misc info settings
 opts.WRITE_MISCINFO = false

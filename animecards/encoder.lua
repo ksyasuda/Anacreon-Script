@@ -9,7 +9,7 @@ local encoder = {}
 local padding = opts.AUDIO_CLIP_PADDING
 local fade_duration = opts.AUDIO_CLIP_FADE
 
--- Local audio-related functions
+-- Local functions
 ---------------------------------------
 
 -- Determines the source audio file and audio track ID.
@@ -44,6 +44,18 @@ end
 local function gen_fade_arg(type, curve, time_pos)
   return string.format("--af-append=afade=t=%s:curve=%s:st=%.3f:d=%.3f", type, curve, time_pos, fade_duration)
 end
+
+local function gen_jpg_quality_arg(quality)
+  quality = math.max(0, math.min(quality, 100)) -- Clamps the value [0; 100]
+  local worseness = 100 - quality               -- Inverts quality
+
+  -- Converting to qscale: 2 (best) to 31 (worst)
+  local qscale = (worseness * 29 / 100) + 2
+  -- The expression "global_quality=N*QP2LAMBDA" replicates `--ovcopts=qscale=N`
+  -- behavior, which was removed from mpv (see mpv commit bfc33da)
+  return string.format('--ovcopts=global_quality=%.1f*QP2LAMBDA,flags=+qscale', qscale)
+end
+
 ---------------------------------------
 
 function encoder.verify_libmp3lame()
@@ -115,6 +127,10 @@ function encoder.create_image(name, timing)
   elseif opts.IMAGE_FORMAT == 'png' then
     table.insert(cmd, '--vf-add=format=rgb24')
     table.insert(cmd, '--ovc=png')
+  elseif opts.IMAGE_FORMAT == 'jpg' then
+    table.insert(cmd, '--ovc=mjpeg')
+    table.insert(cmd, '--vf-add=scale=out_range=full')
+    table.insert(cmd, gen_jpg_quality_arg(opts.JPG_QUALITY))
   end
 
   table.insert(cmd, '--vf-add=scale=480*iw*sar/ih:480')
