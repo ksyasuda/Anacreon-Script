@@ -400,7 +400,7 @@ local function create_screenshot(start_time, end_time)
     table.insert(cmd, '--vf-add=format=rgb24')
     table.insert(cmd, '--ovc=png')
   end
-  table.insert(cmd, string.format('--vf-add=scale=%d*iw*sar/ih:%d', IMAGE_SIZE))
+  table.insert(cmd, string.format('--vf-add=scale=%d*iw*sar/ih:%d', IMAGE_SIZE, IMAGE_SIZE))
   table.insert(cmd, string.format('--start=%.3f', mp.get_property_number("time-pos")))
   table.insert(cmd, '--ofopts-add=update=1')
   table.insert(cmd, string.format('-o=%s', img))
