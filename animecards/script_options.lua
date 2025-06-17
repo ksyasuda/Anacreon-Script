@@ -23,7 +23,7 @@ opts.USE_MPV_VOLUME = false
 opts.AUTOPLAY_AUDIO = false
 
 -- Image settings
-opts.IMAGE_FORMAT = "png" -- png | jpg | webp
+opts.IMAGE_FORMAT = "jpg" -- png | jpg | webp
 opts.IMAGE_HEIGHT = 480   -- if 0 then don't scale
 opts.JPG_QUALITY = 80     -- 0-100
 
