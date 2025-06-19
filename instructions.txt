@@ -1,0 +1,19 @@
+To install the script place the 'animecards' folder into your mpv scripts folder and the settings into your mpv script-opts folder.
+
+On Windows:
+    C:/Users/<YourUsername>/AppData/Roaming/mpv/scripts/animecards
+    C:/Users/<YourUsername>/AppData/Roaming/mpv/script-opts/animecards.conf
+
+On Linux (usually):
+    ~/.config/mpv/scripts/animecards
+    ~/.config/mpv/script-opts/animecards.conf
+
+On MacOS:
+    Depends on your mpv installation.
+
+The final folder structure should look like this:
+    mpv/scripts/animecards
+    ├── main.lua
+    └── card_builder.lua
+
+    mpv/script-opts/animecards.conf
