@@ -56,7 +56,9 @@ function subtitle_observer.specify_range(lines)
     tools.dlog("Processing line: " .. line)
 
     if not subs[line] then
-      mp.osd_message("ERR! Line not found: " .. line, 3)
+      mp.osd_message("ERR! Line not found: " ..
+        line .. "\nIf you're using Renji's texthooker disable the option 'Preserve Whitespace'." ..
+        "\nThis is an issue with multi line subs that will be addressed in the future.", 8)
       msg.error("Line not found: " .. line)
       return
     end
