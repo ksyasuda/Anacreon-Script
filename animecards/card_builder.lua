@@ -22,7 +22,7 @@ local function generate_miscinfo(start_time)
 end
 
 local function format_sentence(lines, noteid)
-  local mpv_sentence = lines:gsub('^\n+', ''):gsub('\n+$', ''):gsub('\r', ''):gsub('\n+', '<br>')
+  local mpv_sentence = lines:gsub('\r', ''):gsub('^\n+', ''):gsub('\n+$', ''):gsub('\n+', '<br>')
 
   if opts.HIGHLIGHT_WORD ~= true then
     return mpv_sentence
