@@ -124,7 +124,7 @@ function clipboard.set(text)
     if display_server == 'wayland' then
       os.execute('wl-copy <<EOF\n' .. text .. '\nEOF\n')
     else -- assume xorg
-      os.execute('xclip -selection clipboard <<EOF\n' .. text .. '\nEOF\n')
+      os.execute('cat <<EOF | xclip -selection clipboard\n' .. text .. '\nEOF\n')
     end
   end
 end
