@@ -6,8 +6,6 @@ local opts = require 'script_options'
 local tools = require 'tools'
 
 local encoder = {}
-local padding = opts.AUDIO_CLIP_PADDING
-local fade_duration = opts.AUDIO_CLIP_FADE
 
 -- Local functions
 ---------------------------------------
@@ -41,8 +39,9 @@ local function define_audio_source()
   return source, audio_id
 end
 
-local function gen_fade_arg(type, curve, time_pos)
-  return string.format("--af-append=afade=t=%s:curve=%s:st=%.3f:d=%.3f", type, curve, time_pos, fade_duration)
+local function gen_fade_arg(fade_type, curve, time_pos)
+  return string.format("--af-append=afade=t=%s:curve=%s:st=%.3f:d=%.3f", fade_type, curve, time_pos, opts
+    .AUDIO_CLIP_FADE)
 end
 
 local function gen_jpg_quality_arg(quality)
@@ -79,8 +78,8 @@ end
 
 function encoder.create_audio(name, start_time, end_time)
   local source, audio_id = define_audio_source()
-  start_time = start_time - padding
-  local audio_length = end_time - start_time + padding
+  start_time = start_time - opts.AUDIO_CLIP_PADDING
+  local audio_length = end_time - start_time + opts.AUDIO_CLIP_PADDING
 
   -- Start time may become negative due to padding subtraction
   if start_time < 0 then
@@ -89,8 +88,6 @@ function encoder.create_audio(name, start_time, end_time)
 
   local volume = opts.USE_MPV_VOLUME and mp.get_property('volume') or '100'
   local channels = opts.AUDIO_MONO and '1' or 'auto'
-  local fadein_arg = gen_fade_arg('in', 'ipar', start_time)
-  local fadeout_arg = gen_fade_arg('out', 'ipar', start_time + audio_length - fade_duration)
   local output = utils.join_path(anki.get_media_dir(), name .. '.mp3')
 
   local cmd = {
@@ -101,9 +98,16 @@ function encoder.create_audio(name, start_time, end_time)
     string.format('--length=%.3f', audio_length),
     string.format('--aid=%s', audio_id),
     string.format('--volume=%s', volume),
-    fadein_arg, fadeout_arg,
-    string.format('-o=%s', output)
   }
+
+  if opts.AUDIO_CLIP_FADE > 0 then
+    local fadein_arg = gen_fade_arg('in', 'ipar', start_time)
+    local fadeout_arg = gen_fade_arg('out', 'ipar', start_time + audio_length - opts.AUDIO_CLIP_FADE)
+    table.insert(cmd, fadein_arg)
+    table.insert(cmd, fadeout_arg)
+  end
+
+  table.insert(cmd, string.format('-o=%s', output))
 
   mp.commandv(table.unpack(cmd))
   tools.dlog(utils.to_string(cmd))
