@@ -20,7 +20,8 @@ function subtitle_observer.record(_, text)
   local sub_start = mp.get_property_number('sub-start')
   local sub_end = mp.get_property_number('sub-end')
 
-  if not text and not sub_start and not sub_end then
+  if not text or text == ""
+      or not sub_start or not sub_end then
     return
   end
 
