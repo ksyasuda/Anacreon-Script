@@ -32,9 +32,16 @@ Depends on your mpv installation.
 ### Final Folder Structure
 Your directory structure should look like this:
 ```
-mpv/scripts/animecards
-├── main.lua
-└── card_builder.lua
+mpv/script-opts/
+└── animecards.conf
 
-mpv/script-opts/animecards.conf
+mpv/scripts/animecards
+├── anki.lua
+├── card_builder.lua
+├── clipboard.lua
+├── encoder.lua
+├── ...
 ```
+
+⚠️ **Important:**  
+Do **not** place the `animecards.conf` file in the `mpv/scripts` folder. It **must** be located in a separate folder: `mpv/script-opts/`
