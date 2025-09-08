@@ -60,9 +60,16 @@ local function format_sentence(lines, noteid)
 end
 
 function card_builder.construct(lines, noteid, start_time, media_name)
+  local image_ext
+  if opts.ANIMATED_IMAGE_ENABLED == true then
+    image_ext = opts.ANIMATED_IMAGE_FORMAT
+  else
+    image_ext = opts.IMAGE_FORMAT
+  end
+
   local fields = {
     [opts.SENTENCE_FIELD] = format_sentence(lines, noteid),
-    [opts.IMAGE_FIELD] = '<img src=' .. media_name .. '.' .. opts.IMAGE_FORMAT .. '>',
+    [opts.IMAGE_FIELD] = '<img src=' .. media_name .. '.' .. image_ext .. '>',
     [opts.SENTENCE_AUDIO_FIELD] = '[sound:' .. media_name .. '.mp3]',
   }
 

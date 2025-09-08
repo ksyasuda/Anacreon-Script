@@ -68,7 +68,8 @@ local function process_cards(note_ids)
   -- Creating media
   local media_name = enc.gen_name(range_start, range_end)
   enc.create_audio(media_name, range_start, range_end)
-  enc.create_image(media_name, current_time)
+  -- Create image: static or animated per opts
+  enc.create_image(media_name, range_start, range_end, current_time)
 
   -- Updating anki cards
   for _, noteid in ipairs(note_ids) do
@@ -190,6 +191,7 @@ end
 mp.add_key_binding("ctrl+v", "update-anki-card", saferun_last_card)
 mp.add_key_binding("ctrl+r", "overwrite-anki-cards", saferun_selected)
 mp.add_key_binding("ctrl+t", "toggle-clipboard-insertion", opts.toggle_sub_to_clipboard)
+mp.add_key_binding("alt+a", "toggle-animated-image", opts.toggle_animated_image)
 
 mp.add_key_binding("ctrl+V", saferun_last_card)
 mp.add_key_binding("ctrl+R", saferun_selected)
