@@ -55,6 +55,21 @@ local function gen_jpg_quality_arg(quality)
   return string.format('--ovcopts=global_quality=%.1f*QP2LAMBDA,flags=+qscale', qscale)
 end
 
+local function fit_quality_percentage_to_range(quality, worst_val, best_val)
+  local scaled = worst_val + (best_val - worst_val) * quality / 100
+  if worst_val > best_val then
+    return math.floor(scaled)
+  end
+  return math.ceil(scaled)
+end
+
+local function quality_to_crf_avif(quality_value)
+  -- For AVIF, CRF 0 (best) to 63 (worst), reversed scale
+  local worst_avif_crf = 63
+  local best_avif_crf = 0
+  return fit_quality_percentage_to_range(quality_value, worst_avif_crf, best_avif_crf)
+end
+
 ---------------------------------------
 
 function encoder.verify_libmp3lame()
@@ -113,39 +128,68 @@ function encoder.create_audio(name, start_time, end_time)
   tools.dlog(utils.to_string(cmd))
 end
 
-function encoder.create_image(name, timing)
+-- Creates either a static image or an animated image depending on options.
+-- For static: uses current_time for a single frame.
+-- For animated: uses [start_time, end_time] segment with fps/quality from options.
+function encoder.create_image(name, start_time, end_time, current_time)
   local source = mp.get_property("path")
-  local output = utils.join_path(anki.get_media_dir(), name .. '.' .. opts.IMAGE_FORMAT)
+  local is_animated = opts.ANIMATED_IMAGE_ENABLED == true
+  local format = is_animated and opts.ANIMATED_IMAGE_FORMAT or opts.IMAGE_FORMAT
+  local output = utils.join_path(anki.get_media_dir(), name .. '.' .. format)
 
   local cmd = {
     'run', 'mpv', source, '--loop-file=no',
-    '--audio=no', '--no-ocopy-metadata',
-    '--no-sub', '--frames=1',
+    '--audio=no', '--no-ocopy-metadata', '--no-sub',
   }
 
-  -- Determining format
-  if opts.IMAGE_FORMAT == 'webp' then
-    table.insert(cmd, '--ovc=libwebp')
-    table.insert(cmd, '--ovcopts-add=lossless=0')
-    table.insert(cmd, '--ovcopts-add=compression_level=6')
-    table.insert(cmd, '--ovcopts-add=preset=drawing')
-  elseif opts.IMAGE_FORMAT == 'png' then
-    table.insert(cmd, '--vf-add=format=rgb24')
-    table.insert(cmd, '--ovc=png')
-  elseif opts.IMAGE_FORMAT == 'jpg' then
-    table.insert(cmd, '--ovc=mjpeg')
-    table.insert(cmd, '--vf-add=scale=out_range=full')
-    table.insert(cmd, gen_jpg_quality_arg(opts.JPG_QUALITY))
+  if is_animated then
+    -- Encoder and quality settings for animated export
+    if format == 'avif' then
+      table.insert(cmd, '--ovc=libaom-av1')
+      table.insert(cmd, '--ovcopts-add=cpu-used=6')
+      table.insert(cmd, string.format('--ovcopts-add=crf=%d', quality_to_crf_avif(opts.ANIMATED_IMAGE_QUALITY)))
+    else -- webp
+      table.insert(cmd, '--ovc=libwebp')
+      table.insert(cmd, '--ovcopts-add=compression_level=6')
+      table.insert(cmd, string.format('--ovcopts-add=quality=%d', opts.ANIMATED_IMAGE_QUALITY))
+    end
+
+    -- Frame rate and scaling
+    table.insert(cmd, string.format('--vf-add=fps=%d', math.max(1, math.min(30, opts.ANIMATED_IMAGE_FPS or 10))))
+    if (opts.ANIMATED_IMAGE_HEIGHT or 0) > 0 then
+      table.insert(cmd, string.format('--vf-add=scale=%d*iw*sar/ih:%d', opts.ANIMATED_IMAGE_HEIGHT, opts.ANIMATED_IMAGE_HEIGHT))
+    end
+
+    -- Time range and container opts
+    table.insert(cmd, string.format('--start=%.3f', start_time))
+    table.insert(cmd, string.format('--end=%.3f', end_time))
+    table.insert(cmd, '--ofopts-add=loop=0')
+  else
+    -- Static image settings
+    table.insert(cmd, '--frames=1')
+
+    if format == 'webp' then
+      table.insert(cmd, '--ovc=libwebp')
+      table.insert(cmd, '--ovcopts-add=lossless=0')
+      table.insert(cmd, '--ovcopts-add=compression_level=6')
+      table.insert(cmd, '--ovcopts-add=preset=drawing')
+    elseif format == 'png' then
+      table.insert(cmd, '--vf-add=format=rgb24')
+      table.insert(cmd, '--ovc=png')
+    elseif format == 'jpg' then
+      table.insert(cmd, '--ovc=mjpeg')
+      table.insert(cmd, '--vf-add=scale=out_range=full')
+      table.insert(cmd, gen_jpg_quality_arg(opts.JPG_QUALITY))
+    end
+
+    if (opts.IMAGE_HEIGHT or 0) > 0 then
+      table.insert(cmd, string.format('--vf-add=scale=%d*iw*sar/ih:%d', opts.IMAGE_HEIGHT, opts.IMAGE_HEIGHT))
+    end
+
+    table.insert(cmd, string.format('--start=%.3f', current_time))
+    table.insert(cmd, '--ofopts-add=update=1')
   end
 
-  -- Determining resolution
-  if opts.IMAGE_HEIGHT > 0 then
-    table.insert(cmd, string.format('--vf-add=scale=%d*iw*sar/ih:%d',
-      opts.IMAGE_HEIGHT, opts.IMAGE_HEIGHT))
-  end
-
-  table.insert(cmd, string.format('--start=%.3f', timing))
-  table.insert(cmd, '--ofopts-add=update=1')
   table.insert(cmd, string.format('-o=%s', output))
 
   mp.commandv(table.unpack(cmd))
