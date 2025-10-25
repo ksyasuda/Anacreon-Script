@@ -25,17 +25,19 @@ function subtitle_observer.record(_, text)
     return
   end
 
-  local sub_delay = mp.get_property_native("sub-delay")
-  local audio_delay = mp.get_property_native("audio-delay")
+  local sub_delay = mp.get_property_native("sub-delay") or 0
   local newtext = clean(text)
 
   if newtext == '' then
     return
   end
 
-  subs[newtext] = { sub_start + sub_delay - audio_delay, sub_end + sub_delay - audio_delay }
+  local video_start = sub_start + sub_delay
+  local video_end = sub_end + sub_delay
 
-  tools.dlog(string.format("%s -> %s : %s", subs[newtext][1], subs[newtext][2], newtext))
+  subs[newtext] = { video_start, video_end }
+
+  tools.dlog(string.format("%.3f -> %.3f : %s", video_start, video_end, newtext))
 
   if opts.ENABLE_SUBS_TO_CLIP == true then
     clip.set(text)
