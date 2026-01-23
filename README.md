@@ -1,3 +1,9 @@
+**Archived 2026-01-23**
+
+No longer using this personally as I've moved to https://github.com/friedrich-de/mpv-subtitleminer
+
+[@adxria](https://github.com/adxria) said he wants to keep providing updates and support for the script. Check out his fork here: https://github.com/adxria/Anacreon-Script
+
 # Anacreon MPV script
 
 Detailed usage guide here: <https://animecards.site/minefromanime/>. Additional instructions in the script itself.
